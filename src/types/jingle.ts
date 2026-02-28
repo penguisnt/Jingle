@@ -5,6 +5,7 @@ export enum Page {
   MainMenu = '/',
   DailyJingle = '/daily',
   Practice = '/practice',
+  MapTraversal = '/traversal',
 }
 
 export enum GameStatus {

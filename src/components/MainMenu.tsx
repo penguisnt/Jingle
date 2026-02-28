@@ -52,6 +52,14 @@ export default function MainMenu({ dailyChallenge, multiLobbies }: MainMenuProps
               <div style={{ fontSize: '40%' }}>∞</div>
             </Link>
 
+            <Link
+              to='/traversal'
+              className='main-menu-option'
+            >
+              <div style={{ lineHeight: '1.0' }}>Map Traversal</div>
+              <div style={{ fontSize: '40%' }}>Explore the map</div>
+            </Link>
+
             {multiLobbies ? (
               <Link
                 to='/multiplayer'

@@ -9,6 +9,7 @@ import Login from './components/Login/Login';
 import MainMenu from './components/MainMenu';
 import MultiplayerLobby from './components/MultiLobby/MultiLobby';
 import Multiplayer from './components/Multiplayer/Multiplayer/Multiplayer';
+import MapTraversal from './components/MapTraversal';
 import Practice from './components/Practice';
 import Profile from './components/Profile/Profile';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
@@ -57,6 +58,10 @@ function App() {
           <Route
             path='/practice'
             element={<Practice />}
+          />
+          <Route
+            path='/traversal'
+            element={<MapTraversal />}
           />
 
           <Route

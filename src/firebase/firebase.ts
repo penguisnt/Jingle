@@ -1,7 +1,8 @@
-import { getAnalytics } from 'firebase/analytics';
+import { Analytics, getAnalytics } from 'firebase/analytics';
 import { initializeApp } from 'firebase/app';
-import { getStorage } from 'firebase/storage';
+import { FirebaseStorage, getStorage } from 'firebase/storage';
 import {
+  Auth,
   createUserWithEmailAndPassword,
   getAuth,
   GoogleAuthProvider,
@@ -21,13 +22,43 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-export const storage = getStorage(app);
+
+let _analytics: Analytics | undefined;
+let _auth: Auth | undefined;
+let _storage: FirebaseStorage | undefined;
+let _googleProvider: GoogleAuthProvider | undefined;
+
+try {
+  _analytics = getAnalytics(app);
+} catch {
+  // Analytics requires valid Firebase config — skip in local dev without credentials
+}
+
+try {
+  _auth = getAuth(app);
+  _googleProvider = new GoogleAuthProvider();
+} catch {
+  // Auth requires valid API key — skip in local dev without credentials
+}
+
+try {
+  _storage = getStorage(app);
+} catch {
+  // Storage requires valid Firebase config — skip in local dev without credentials
+}
+
+// Cast to non-undefined for consumers that require Firebase (Login, Profile, etc.)
+// These will only be used on routes that need auth, which won't work without config anyway.
+const analytics = _analytics as Analytics;
+const auth = _auth as Auth;
+const googleProvider = _googleProvider as GoogleAuthProvider;
+const storage = _storage as FirebaseStorage;
 
 export {
   analytics,
+  auth,
+  googleProvider,
+  storage,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,

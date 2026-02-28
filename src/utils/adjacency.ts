@@ -1,3 +1,25 @@
+/**
+ * Adjacency data for the Map Traversal game mode.
+ *
+ * Builds a graph of surface song regions and their neighbors from GeoJSON polygon data.
+ * Precomputed lazily on first access and cached for the session.
+ *
+ * Key design decisions:
+ *
+ * 1. **Edge-based neighbor detection (not vertex-based)**
+ *    Two regions are neighbors only if their polygon edges overlap — sharing just a
+ *    corner point does NOT count. This is detected by sampling integer points along each
+ *    polygon edge (excluding endpoints) and checking for overlap. This handles cases where
+ *    polygons share a collinear edge segment but have different vertices along it
+ *    (e.g. Medieval [3268,3456]->[3328,3456] overlaps Doorways [3264,3456]->[3328,3456]
+ *    but they only share the single vertex [3328,3456]).
+ *
+ * 2. **Disconnected cluster splitting**
+ *    Songs that appear in multiple disconnected map areas (e.g. a song playing near both
+ *    Digsite and Rellekka) are split into separate regions. Intra-song clustering uses
+ *    shared vertices (corners count) since tiles of the same song should be grouped
+ *    together even if they only touch at corners.
+ */
 import { Position } from 'geojson';
 import geojsondata from '../data/GeoJSON';
 import { decodeHTML } from './string-utils';
@@ -113,43 +135,72 @@ function buildRegions(): TraversalRegion[] {
     }
   }
 
-  // Build coordinate -> region ID lookup with rounding for near-miss vertices
-  const coordToRegionIds = new Map<string, Set<number>>();
+  // Build edge-point -> region ID lookup.
+  // Sample integer points along each edge so that collinear overlapping edges
+  // (e.g. Medieval [3268,3456]->[3328,3456] overlapping Doorways [3264,3456]->[3328,3456])
+  // produce shared points even when vertices don't match.
+  const edgePointToRegionIds = new Map<string, Set<number>>();
+
+  function addEdgePoints(regionId: number, x1: number, y1: number, x2: number, y2: number) {
+    const rx1 = roundCoord(x1), ry1 = roundCoord(y1);
+    const rx2 = roundCoord(x2), ry2 = roundCoord(y2);
+    const dx = rx2 - rx1, dy = ry2 - ry1;
+    const steps = Math.max(Math.abs(dx), Math.abs(dy));
+    if (steps === 0) return;
+
+    // Sample points along the edge at unit intervals (skip endpoints to avoid corner-only matches)
+    for (let s = 1; s < steps; s++) {
+      const px = Math.round(rx1 + (dx * s) / steps);
+      const py = Math.round(ry1 + (dy * s) / steps);
+      const key = `${px},${py}`;
+      if (!edgePointToRegionIds.has(key)) {
+        edgePointToRegionIds.set(key, new Set());
+      }
+      edgePointToRegionIds.get(key)!.add(regionId);
+    }
+  }
 
   for (const region of regions) {
     for (const polygon of region.polygons) {
-      for (const coord of polygon) {
-        const key = `${roundCoord(coord[0])},${roundCoord(coord[1])}`;
-        if (!coordToRegionIds.has(key)) {
-          coordToRegionIds.set(key, new Set());
-        }
-        coordToRegionIds.get(key)!.add(region.id);
+      for (let i = 0; i < polygon.length; i++) {
+        const curr = polygon[i];
+        const next = polygon[(i + 1) % polygon.length];
+        addEdgePoints(region.id, curr[0], curr[1], next[0], next[1]);
       }
     }
   }
 
-  // Calculate neighbors — require at least 2 shared coordinates (a shared edge, not just a corner)
+  // Two regions are neighbors if they share at least one interior edge point
   for (const region of regions) {
-    const sharedCounts = new Map<number, number>();
+    const neighborSet = new Set<number>();
 
     for (const polygon of region.polygons) {
-      for (const coord of polygon) {
-        const key = `${roundCoord(coord[0])},${roundCoord(coord[1])}`;
-        const sharing = coordToRegionIds.get(key);
-        if (sharing) {
-          for (const neighborId of sharing) {
-            if (neighborId !== region.id) {
-              sharedCounts.set(neighborId, (sharedCounts.get(neighborId) ?? 0) + 1);
+      for (let i = 0; i < polygon.length; i++) {
+        const curr = polygon[i];
+        const next = polygon[(i + 1) % polygon.length];
+        const rx1 = roundCoord(curr[0]), ry1 = roundCoord(curr[1]);
+        const rx2 = roundCoord(next[0]), ry2 = roundCoord(next[1]);
+        const dx = rx2 - rx1, dy = ry2 - ry1;
+        const steps = Math.max(Math.abs(dx), Math.abs(dy));
+        if (steps === 0) continue;
+
+        for (let s = 1; s < steps; s++) {
+          const px = Math.round(rx1 + (dx * s) / steps);
+          const py = Math.round(ry1 + (dy * s) / steps);
+          const key = `${px},${py}`;
+          const sharing = edgePointToRegionIds.get(key);
+          if (sharing) {
+            for (const neighborId of sharing) {
+              if (neighborId !== region.id) {
+                neighborSet.add(neighborId);
+              }
             }
           }
         }
       }
     }
 
-    region.neighborIds = Array.from(sharedCounts.entries())
-      .filter(([, count]) => count >= 2)
-      .map(([id]) => id)
-      .sort((a, b) => a - b);
+    region.neighborIds = Array.from(neighborSet).sort((a, b) => a - b);
   }
 
   return regions;

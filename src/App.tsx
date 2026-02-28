@@ -10,6 +10,7 @@ import MainMenu from './components/MainMenu';
 import MultiplayerLobby from './components/MultiLobby/MultiLobby';
 import Multiplayer from './components/Multiplayer/Multiplayer/Multiplayer';
 import MapTraversal from './components/MapTraversal';
+import TraversalDebugPage from './components/TraversalDebugMap';
 import Practice from './components/Practice';
 import Profile from './components/Profile/Profile';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
@@ -62,6 +63,10 @@ function App() {
           <Route
             path='/traversal'
             element={<MapTraversal />}
+          />
+          <Route
+            path='/traversal/debug'
+            element={<TraversalDebugPage />}
           />
 
           <Route

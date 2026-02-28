@@ -22,6 +22,52 @@ function roundCoord(val: number): number {
   return Math.round(val);
 }
 
+// Split a song's polygons into spatially connected clusters.
+// Uses >= 1 shared coord (corners count) since these are tiles of the SAME song.
+// The stricter >= 2 rule is only for inter-region neighbor detection.
+function splitIntoClusters(polygons: Position[][]): Position[][][] {
+  const polyCoordSets: Set<string>[] = polygons.map((poly) => {
+    const keys = new Set<string>();
+    for (const coord of poly) {
+      keys.add(`${roundCoord(coord[0])},${roundCoord(coord[1])}`);
+    }
+    return keys;
+  });
+
+  // Union-Find
+  const parent = polygons.map((_, i) => i);
+  function find(x: number): number {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+  function union(a: number, b: number) {
+    parent[find(a)] = find(b);
+  }
+
+  for (let i = 0; i < polygons.length; i++) {
+    for (let j = i + 1; j < polygons.length; j++) {
+      for (const key of polyCoordSets[i]) {
+        if (polyCoordSets[j].has(key)) {
+          union(i, j);
+          break;
+        }
+      }
+    }
+  }
+
+  const groups = new Map<number, Position[][]>();
+  for (let i = 0; i < polygons.length; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(polygons[i]);
+  }
+
+  return Array.from(groups.values());
+}
+
 function buildRegions(): TraversalRegion[] {
   const features = geojsondata.features;
 
@@ -51,16 +97,20 @@ function buildRegions(): TraversalRegion[] {
     }
   }
 
-  // Assign stable IDs and build regions
+  // Assign IDs — split disconnected polygon clusters into separate regions
+  // so that e.g. a song playing near both Digsite and Rellekka becomes two regions
   const regions: TraversalRegion[] = [];
   let id = 1;
   for (const [songName, data] of songMap) {
-    regions.push({
-      id: id++,
-      songName,
-      polygons: data.polygons,
-      neighborIds: [],
-    });
+    const clusters = splitIntoClusters(data.polygons);
+    for (const cluster of clusters) {
+      regions.push({
+        id: id++,
+        songName,
+        polygons: cluster,
+        neighborIds: [],
+      });
+    }
   }
 
   // Build coordinate -> region ID lookup with rounding for near-miss vertices

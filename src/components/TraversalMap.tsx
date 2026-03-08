@@ -162,15 +162,16 @@ function TraversalMap({ gameState, wrongGuessRegionIds, onRegionClick }: Travers
         );
       })}
 
-      {/* Shark food drop on a frontier region */}
-      {gameState.sharkRegionId != null && gameState.status === 'playing' && (() => {
-        const sharkRegion = getRegionById(gameState.sharkRegionId);
+      {/* Shark food drops on frontier regions */}
+      {gameState.status === 'playing' && gameState.sharkRegionIds.map((sharkId) => {
+        const sharkRegion = getRegionById(sharkId);
         if (!sharkRegion || !sharkRegion.polygons[0]) return null;
         const coords = sharkRegion.polygons[0];
         const centerX = coords.reduce((sum, c) => sum + c[0], 0) / coords.length;
         const centerY = coords.reduce((sum, c) => sum + c[1], 0) / coords.length;
         return (
           <Marker
+            key={`shark-${sharkId}`}
             position={[centerY, centerX]}
             icon={new Icon({
               iconUrl: '/assets/osrs_shark.png',
@@ -180,7 +181,7 @@ function TraversalMap({ gameState, wrongGuessRegionIds, onRegionClick }: Travers
             interactive={false}
           />
         );
-      })()}
+      })}
 
       <TileLayer
         ref={tileLayerRef}

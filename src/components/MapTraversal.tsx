@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import useTraversalLogic from '../hooks/useTraversalLogic';
 import { playSong } from '../utils/playSong';
 import Footer from './Footer';
@@ -11,14 +11,12 @@ export default function MapTraversal() {
     useTraversalLogic();
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Initialize game on mount
-  useEffect(() => {
+  const handleStart = () => {
     const songName = initGame();
     if (songName) {
       playSong(audioRef, songName, false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
 
   const onRegionClick = (regionId: number) => {
     const result = handleRegionClick(regionId);
@@ -75,25 +73,42 @@ export default function MapTraversal() {
             </div>
 
             {/* Game status */}
+            {gameState.status === 'waiting' && (
+              <Button label="Start" onClick={handleStart} classes="guess-btn" />
+            )}
+
             {gameState.status === 'playing' && (
-              <label className="osrs-frame guess-btn">
-                Click the region where this song plays
-              </label>
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="osrs-frame guess-btn" style={{ whiteSpace: 'nowrap', maxWidth: 'none' }}>
+                  Click the region where this song plays
+                </label>
+                {gameState.lastSongName && (
+                  <label className="osrs-frame guess-btn" style={{ fontSize: '0.85rem' }}>
+                    Last song: {gameState.lastSongName}
+                  </label>
+                )}
+              </div>
             )}
 
             {gameState.status === 'lost' && (
-              <div style={{ textAlign: 'center' }}>
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label className="osrs-frame guess-btn" style={{ color: '#ff4444' }}>
                   Game Over! Score: {gameState.score} tiles
+                </label>
+                <label className="osrs-frame guess-btn" style={{ fontSize: '0.85rem' }}>
+                  Last song: {gameState.currentSongName}
                 </label>
                 <Button label="Play Again" onClick={handleRestart} classes="guess-btn" />
               </div>
             )}
 
             {gameState.status === 'won' && (
-              <div style={{ textAlign: 'center' }}>
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label className="osrs-frame guess-btn" style={{ color: '#00ff00' }}>
                   You unlocked every tile! Score: {gameState.score}
+                </label>
+                <label className="osrs-frame guess-btn" style={{ fontSize: '0.85rem' }}>
+                  Last song: {gameState.lastSongName}
                 </label>
                 <Button label="Play Again" onClick={handleRestart} classes="guess-btn" />
               </div>
@@ -115,23 +130,6 @@ export default function MapTraversal() {
         onRegionClick={onRegionClick}
       />
 
-      {/* Song name reveal on game over */}
-      {isGameOver && gameState.currentSongName && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '120px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1000,
-            padding: '8px 16px',
-            borderRadius: '4px',
-          }}
-          className="osrs-frame"
-        >
-          Last song: {gameState.currentSongName}
-        </div>
-      )}
     </>
   );
 }

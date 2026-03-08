@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { getNeighborIds, getRegionById, getSurfaceRegions } from '../utils/adjacency';
 
-export type TraversalStatus = 'playing' | 'lost' | 'won';
+export type TraversalStatus = 'waiting' | 'playing' | 'lost' | 'won';
 
 export interface TraversalGameState {
   status: TraversalStatus;
@@ -10,8 +10,9 @@ export interface TraversalGameState {
   frontierRegionIds: number[];
   targetRegionId: number | null;
   currentSongName: string;
+  lastSongName: string;
   score: number;
-  sharkRegionId: number | null; // region where shark food drop is sitting
+  sharkRegionIds: number[]; // regions where shark food drops are sitting
   correctStreak: number; // counts correct guesses for shark spawn timing
 }
 
@@ -42,14 +43,15 @@ function computeFrontier(unlockedIds: number[]): number[] {
 
 export default function useTraversalLogic() {
   const [gameState, setGameState] = useState<TraversalGameState>({
-    status: 'playing',
+    status: 'waiting',
     lives: INITIAL_LIVES,
     unlockedRegionIds: [],
     frontierRegionIds: [],
     targetRegionId: null,
     currentSongName: '',
+    lastSongName: '',
     score: 0,
-    sharkRegionId: null,
+    sharkRegionIds: [],
     correctStreak: 0,
   });
 
@@ -77,8 +79,9 @@ export default function useTraversalLogic() {
         frontierRegionIds: [],
         targetRegionId: null,
         currentSongName: startRegion.songName,
+        lastSongName: '',
         score: 1,
-        sharkRegionId: null,
+        sharkRegionIds: [],
         correctStreak: 0,
       });
       return startRegion.songName;
@@ -94,8 +97,9 @@ export default function useTraversalLogic() {
       frontierRegionIds: frontier,
       targetRegionId: targetId,
       currentSongName: targetRegion.songName,
+      lastSongName: '',
       score: 1,
-      sharkRegionId: null,
+      sharkRegionIds: [],
       correctStreak: 1,
     });
 
@@ -115,8 +119,8 @@ export default function useTraversalLogic() {
         // Correct guess — clear wrong guesses for the round
         setWrongGuessRegionIds(new Set());
 
-        // Check if shark was eaten (correct guess on the shark tile)
-        const ateShark = state.sharkRegionId === regionId;
+        // Check if shark was eaten (correct guess on a shark tile)
+        const ateShark = state.sharkRegionIds.includes(regionId);
         const newLives = ateShark
           ? Math.min(state.lives + 1, INITIAL_LIVES)
           : state.lives;
@@ -124,6 +128,11 @@ export default function useTraversalLogic() {
         const newStreak = state.correctStreak + 1;
         const newUnlocked = [...state.unlockedRegionIds, regionId];
         const newFrontier = computeFrontier(newUnlocked);
+
+        // Remove eaten shark and any sharks no longer on the frontier
+        const frontierSet = new Set(newFrontier);
+        let newSharkRegionIds = state.sharkRegionIds
+          .filter((id) => id !== regionId && frontierSet.has(id));
 
         if (newFrontier.length === 0) {
           // Won - no more frontier
@@ -134,8 +143,9 @@ export default function useTraversalLogic() {
             unlockedRegionIds: newUnlocked,
             frontierRegionIds: [],
             targetRegionId: null,
+            lastSongName: state.currentSongName,
             score: newUnlocked.length,
-            sharkRegionId: null,
+            sharkRegionIds: [],
             correctStreak: newStreak,
           });
           return { correct: true, songName: null, gameOver: true, healed: ateShark };
@@ -144,10 +154,13 @@ export default function useTraversalLogic() {
         const nextTargetId = pickRandom(newFrontier);
         const nextTarget = getRegionById(nextTargetId)!;
 
-        // Spawn shark every SHARK_INTERVAL correct guesses
-        let newSharkRegionId = ateShark ? null : state.sharkRegionId;
+        // Spawn a new shark every SHARK_INTERVAL correct guesses
         if (newStreak % SHARK_INTERVAL === 0) {
-          newSharkRegionId = pickRandom(newFrontier);
+          // Pick a frontier tile that doesn't already have a shark
+          const available = newFrontier.filter((id) => !newSharkRegionIds.includes(id));
+          if (available.length > 0) {
+            newSharkRegionIds = [...newSharkRegionIds, pickRandom(available)];
+          }
         }
 
         setGameState({
@@ -157,8 +170,9 @@ export default function useTraversalLogic() {
           frontierRegionIds: newFrontier,
           targetRegionId: nextTargetId,
           currentSongName: nextTarget.songName,
+          lastSongName: state.currentSongName,
           score: newUnlocked.length,
-          sharkRegionId: newSharkRegionId,
+          sharkRegionIds: newSharkRegionIds,
           correctStreak: newStreak,
         });
 

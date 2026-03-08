@@ -61,34 +61,38 @@ export default function useTraversalLogic() {
   // Ref to track if game has been initialized
   const initializedRef = useRef(false);
 
-  const initGame = useCallback(() => {
+  const initGame = useCallback((startRegionId?: number) => {
     const regions = getSurfaceRegions();
-    // Pick a random starting region that has neighbors
+    // Pick a random starting region that has neighbors, or use the specified one
     const regionsWithNeighbors = regions.filter((r) => r.neighborIds.length > 0);
-    const startRegion = pickRandom(regionsWithNeighbors);
+    const startRegion = startRegionId
+      ? (getRegionById(startRegionId) ?? pickRandom(regionsWithNeighbors))
+      : pickRandom(regionsWithNeighbors);
 
     const unlocked = [startRegion.id];
     const frontier = computeFrontier(unlocked);
 
     if (frontier.length === 0) {
       // Extremely unlikely but handle it
+      const song = pickRandom(startRegion.songNames);
       setGameState({
         status: 'won',
         lives: INITIAL_LIVES,
         unlockedRegionIds: unlocked,
         frontierRegionIds: [],
         targetRegionId: null,
-        currentSongName: startRegion.songName,
+        currentSongName: song,
         lastSongName: '',
         score: 1,
         sharkRegionIds: [],
         correctStreak: 0,
       });
-      return startRegion.songName;
+      return song;
     }
 
     const targetId = pickRandom(frontier);
     const targetRegion = getRegionById(targetId)!;
+    const targetSong = pickRandom(targetRegion.songNames);
 
     setGameState({
       status: 'playing',
@@ -96,7 +100,7 @@ export default function useTraversalLogic() {
       unlockedRegionIds: unlocked,
       frontierRegionIds: frontier,
       targetRegionId: targetId,
-      currentSongName: targetRegion.songName,
+      currentSongName: targetSong,
       lastSongName: '',
       score: 1,
       sharkRegionIds: [],
@@ -104,7 +108,7 @@ export default function useTraversalLogic() {
     });
 
     initializedRef.current = true;
-    return targetRegion.songName;
+    return targetSong;
   }, []);
 
   const handleRegionClick = useCallback(
@@ -153,6 +157,7 @@ export default function useTraversalLogic() {
 
         const nextTargetId = pickRandom(newFrontier);
         const nextTarget = getRegionById(nextTargetId)!;
+        const nextSong = pickRandom(nextTarget.songNames);
 
         // Spawn a new shark every SHARK_INTERVAL correct guesses
         if (newStreak % SHARK_INTERVAL === 0) {
@@ -169,14 +174,14 @@ export default function useTraversalLogic() {
           unlockedRegionIds: newUnlocked,
           frontierRegionIds: newFrontier,
           targetRegionId: nextTargetId,
-          currentSongName: nextTarget.songName,
+          currentSongName: nextSong,
           lastSongName: state.currentSongName,
           score: newUnlocked.length,
           sharkRegionIds: newSharkRegionIds,
           correctStreak: newStreak,
         });
 
-        return { correct: true, songName: nextTarget.songName, gameOver: false, healed: ateShark };
+        return { correct: true, songName: nextSong, gameOver: false, healed: ateShark };
       } else {
         // Wrong guess — mark region as guessed this round
         setWrongGuessRegionIds((prev) => new Set(prev).add(regionId));

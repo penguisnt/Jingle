@@ -26,7 +26,7 @@ import { decodeHTML } from './string-utils';
 
 export interface TraversalRegion {
   id: number;
-  songName: string;
+  songNames: string[];
   polygons: Position[][]; // all mapId===0 polygons for this song
   neighborIds: number[];
 }
@@ -121,17 +121,51 @@ function buildRegions(): TraversalRegion[] {
 
   // Assign IDs — split disconnected polygon clusters into separate regions
   // so that e.g. a song playing near both Digsite and Rellekka becomes two regions
-  const regions: TraversalRegion[] = [];
+  let premergeRegions: TraversalRegion[] = [];
   let id = 1;
   for (const [songName, data] of songMap) {
     const clusters = splitIntoClusters(data.polygons);
     for (const cluster of clusters) {
-      regions.push({
+      premergeRegions.push({
         id: id++,
-        songName,
+        songNames: [songName],
         polygons: cluster,
         neighborIds: [],
       });
+    }
+  }
+
+  // Merge regions with identical polygon geometry (multiple songs sharing the same area)
+  function polygonFingerprint(polygons: Position[][]): string {
+    return polygons
+      .map((poly) =>
+        poly.map((c) => `${roundCoord(c[0])},${roundCoord(c[1])}`).join(';'),
+      )
+      .sort()
+      .join('|');
+  }
+
+  const fingerprintMap = new Map<string, number>(); // fingerprint -> index in regions
+  const regions: TraversalRegion[] = [];
+  for (const region of premergeRegions) {
+    const fp = polygonFingerprint(region.polygons);
+    const existingIdx = fingerprintMap.get(fp);
+    if (existingIdx !== undefined) {
+      // Merge song names into existing region
+      regions[existingIdx].songNames.push(...region.songNames);
+    } else {
+      fingerprintMap.set(fp, regions.length);
+      regions.push(region);
+    }
+  }
+
+  const mergedCount = premergeRegions.length - regions.length;
+  if (mergedCount > 0) {
+    console.log(`[ADJ] Merged ${mergedCount} duplicate-polygon regions. ${premergeRegions.length} → ${regions.length}`);
+    for (const r of regions) {
+      if (r.songNames.length > 1) {
+        console.log(`[ADJ]   Region ${r.id}: ${r.songNames.join(', ')}`);
+      }
     }
   }
 
@@ -202,6 +236,56 @@ function buildRegions(): TraversalRegion[] {
 
     region.neighborIds = Array.from(neighborSet).sort((a, b) => a - b);
   }
+
+  // === DEBUG LOGGING ===
+  const DEBUG_SONGS = ["Varlamore's Sunset", "Scorching Horizon", "The Undying Light", "Creatures of Varlamore"];
+  for (const region of regions) {
+    if (DEBUG_SONGS.some((s) => region.songNames.some((sn) => sn.includes(s)))) {
+      const neighbors = region.neighborIds.map((nId) => {
+        const n = regions.find((r) => r.id === nId);
+        return `${nId}:${n?.songNames.join('/') ?? '?'}`;
+      });
+      console.log(`[ADJ DEBUG] Region ${region.id} "${region.songNames.join(', ')}"`);;
+      console.log(`  Polygons: ${region.polygons.length}`);
+      for (const poly of region.polygons) {
+        console.log(`  Polygon vertices (${poly.length}):`);
+        for (let i = 0; i < poly.length; i++) {
+          const curr = poly[i];
+          const next = poly[(i + 1) % poly.length];
+          const rx1 = roundCoord(curr[0]), ry1 = roundCoord(curr[1]);
+          const rx2 = roundCoord(next[0]), ry2 = roundCoord(next[1]);
+          const dx = rx2 - rx1, dy = ry2 - ry1;
+          const steps = Math.max(Math.abs(dx), Math.abs(dy));
+          const sampledCount = Math.max(0, steps - 1);
+          console.log(`    [${rx1},${ry1}] -> [${rx2},${ry2}]  steps=${steps}  samples=${sampledCount}${sampledCount === 0 && steps > 0 ? ' ⚠️ INVISIBLE EDGE' : ''}`);
+        }
+      }
+      console.log(`  Neighbors (${region.neighborIds.length}): ${neighbors.join(', ') || 'NONE'}`);
+    }
+  }
+
+  // Log regions with 0 or 1 neighbors as potential issues
+  const lowNeighborRegions = regions.filter((r) => r.neighborIds.length <= 1);
+  if (lowNeighborRegions.length > 0) {
+    console.log(`[ADJ DEBUG] Regions with 0-1 neighbors (${lowNeighborRegions.length}):`);
+    for (const r of lowNeighborRegions) {
+      const totalEdges = r.polygons.reduce((sum, poly) => sum + poly.length, 0);
+      const invisibleEdges = r.polygons.reduce((sum, poly) => {
+        let count = 0;
+        for (let i = 0; i < poly.length; i++) {
+          const curr = poly[i];
+          const next = poly[(i + 1) % poly.length];
+          const dx = roundCoord(next[0]) - roundCoord(curr[0]);
+          const dy = roundCoord(next[1]) - roundCoord(curr[1]);
+          const steps = Math.max(Math.abs(dx), Math.abs(dy));
+          if (steps === 1) count++;
+        }
+        return sum + count;
+      }, 0);
+      console.log(`  ${r.id} "${r.songNames.join(', ')}" — ${r.neighborIds.length} neighbors, ${totalEdges} edges (${invisibleEdges} invisible/1-step)`);
+    }
+  }
+  // === END DEBUG LOGGING ===
 
   return regions;
 }

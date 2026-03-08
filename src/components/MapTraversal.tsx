@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import useTraversalLogic from '../hooks/useTraversalLogic';
 import { playSong } from '../utils/playSong';
 import Footer from './Footer';
@@ -7,12 +8,14 @@ import TraversalMapWrapper from './TraversalMap';
 import { Button } from './ui-util/Button';
 
 export default function MapTraversal() {
+  const [searchParams] = useSearchParams();
   const { gameState, wrongGuessRegionIds, initGame, handleRegionClick, resetGame } =
     useTraversalLogic();
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const handleStart = () => {
-    const songName = initGame();
+    const startRegion = searchParams.get('startRegion');
+    const songName = initGame(startRegion ? Number(startRegion) : undefined);
     if (songName) {
       playSong(audioRef, songName, false);
     }

@@ -8,7 +8,7 @@ A new game mode where you explore the OSRS map one region at a time. You start o
 
 ![Map Traversal screenshot](docs/traversal-screenshot.png)
 
-For a full breakdown of the rules and how it was built, see [Map Traversal - Deep Dive](docs/MAP_TRAVERSAL.md).
+[Try it out](https://jingle-traversal.vercel.app/traversal) | For a full breakdown of the rules and how it was built, see [Map Traversal - Deep Dive](docs/MAP_TRAVERSAL.md).
 
 ## Gameplay
 

@@ -1,5 +1,5 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import Snowfall from 'react-snowfall';
 import useSWR from 'swr';
 import './App.css';
@@ -61,13 +61,15 @@ function App() {
             element={<Practice />}
           />
           <Route
-            path='/traversal'
+            path='/adventure'
             element={<MapTraversal />}
           />
           <Route
-            path='/traversal/debug'
+            path='/adventure/debug'
             element={<TraversalDebugPage />}
           />
+          <Route path='/traversal' element={<Navigate to='/adventure' replace />} />
+          <Route path='/traversal/debug' element={<Navigate to='/adventure/debug' replace />} />
 
           <Route
             path='/multiplayer'

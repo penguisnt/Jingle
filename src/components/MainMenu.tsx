@@ -53,10 +53,10 @@ export default function MainMenu({ dailyChallenge, multiLobbies }: MainMenuProps
             </Link>
 
             <Link
-              to='/traversal'
+              to='/adventure'
               className='main-menu-option'
             >
-              <div style={{ lineHeight: '1.0' }}>Map Traversal</div>
+              <div style={{ lineHeight: '1.0' }}>Adventure Mode</div>
               <div style={{ fontSize: '40%' }}>Explore the map</div>
             </Link>
 

@@ -53,6 +53,7 @@ export const PORT_LINKS: PortLink[] = [
   { regionA: 233, coordA: [2578, 2840], regionB: 353, coordB: [2910, 3227] }, // On the Shore ↔ Emperor
   { regionA: 140, coordA: [1369, 3641], regionB: 131, coordB: [1406, 3612] }, // Gill Bill ↔ The Forests of Shayzien
   { regionA: 23, coordA: [1494, 2985], regionB: 27, coordB: [1444, 2977] }, // Varlamore's Sunset ↔ Peace and Prosperity / Isle of Serenity
+  { regionA: 268, coordA: [2955, 3146], regionB: 269, coordB: [3030, 3218] }, // Sea Shanty ↔ Sea Shanty 2
 ];
 
 export function getPortLinksForRegion(regionId: number): PortLink[] {

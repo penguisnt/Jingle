@@ -369,7 +369,7 @@ export default function TraversalDebugPage() {
                     {hiddenRegionIds.has(selected.region.id) ? 'Show' : 'Hide'}
                   </button>
                   <button
-                    onClick={() => navigate(`/traversal?startRegion=${selected.region.id}`)}
+                    onClick={() => navigate(`/adventure?startRegion=${selected.region.id}`)}
                     style={{
                       padding: '4px 10px',
                       fontSize: '0.8rem',

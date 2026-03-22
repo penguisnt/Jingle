@@ -28,6 +28,14 @@ export default function Footer() {
         </a>
         {', and '}
         <span className='link'>Kunito Moe</span>
+        <br />
+        {'Adventure Mode by '}
+        <a
+          href='https://github.com/penguisnt'
+          className='link'
+        >
+          penguisnt
+        </a>
       </div>
       <span className='footer-icons'>
         <a

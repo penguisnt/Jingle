@@ -147,7 +147,7 @@ export default function MapTraversal() {
               <audio controls id="audio" ref={audioRef} />
             </div>
 
-            <Footer />
+            {gameState.status === 'waiting' && <Footer />}
           </div>
         </div>
       </div>

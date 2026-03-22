@@ -1,6 +1,6 @@
 import L, { CRS, Icon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { MapContainer, Marker, Polygon, Polyline, TileLayer, useMap } from 'react-leaflet';
 import { CENTER_COORDINATES } from '../constants/defaults';
 import { TraversalGameState } from '../hooks/useTraversalLogic';
@@ -33,6 +33,29 @@ export default function TraversalMapWrapper(props: TraversalMapProps) {
 
 function coordsToLatLngs(coords: number[][]): L.LatLngExpression[] {
   return coords.map(([x, y]) => [y, x] as L.LatLngExpression);
+}
+
+function PortLinkPolyline({ positions, animate }: { positions: L.LatLngExpression[]; animate: boolean }) {
+  const ref = useCallback((el: L.Polyline | null) => {
+    if (!el || !animate) return;
+    // Defer to ensure SVG element exists in DOM
+    queueMicrotask(() => {
+      el.getElement()?.classList.add('port-link-line');
+    });
+  }, [animate]);
+
+  return (
+    <Polyline
+      ref={ref}
+      positions={positions}
+      pathOptions={{
+        color: '#00e5ff',
+        weight: 2,
+        dashArray: animate ? '8 6' : undefined,
+        className: animate ? 'port-link-line' : '',
+      }}
+    />
+  );
 }
 
 function TraversalMap({ gameState, wrongGuessRegionIds, eliminatedRegionIds, onRegionClick, onRegionRightClick }: TraversalMapProps) {
@@ -223,14 +246,9 @@ function TraversalMap({ gameState, wrongGuessRegionIds, eliminatedRegionIds, onR
         const endCoord: [number, number] = fromA || bothUnlocked ? [link.coordB[1], link.coordB[0]] : [link.coordA[1], link.coordA[0]];
         return (
           <span key={`port-link-${i}`}>
-            <Polyline
+            <PortLinkPolyline
               positions={[startCoord, endCoord]}
-              pathOptions={{
-                color: '#00e5ff',
-                weight: 2,
-                dashArray: bothUnlocked ? undefined : '8 6',
-                className: bothUnlocked ? '' : 'port-link-line',
-              }}
+              animate={!bothUnlocked}
             />
             <Marker
               position={[link.coordA[1], link.coordA[0]]}

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useTraversalLogic from '../hooks/useTraversalLogic';
 import { playSong } from '../utils/playSong';
@@ -9,11 +9,13 @@ import { Button } from './ui-util/Button';
 
 export default function MapTraversal() {
   const [searchParams] = useSearchParams();
-  const { gameState, wrongGuessRegionIds, initGame, handleRegionClick, resetGame } =
+  const { gameState, wrongGuessRegionIds, eliminatedRegionIds, highScore, initGame, handleRegionClick, toggleEliminatedRegion, resetGame } =
     useTraversalLogic();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [isNewHighScore, setIsNewHighScore] = useState(false);
 
   const handleStart = () => {
+    setIsNewHighScore(false);
     const startRegion = searchParams.get('startRegion');
     const songName = initGame(startRegion ? Number(startRegion) : undefined);
     if (songName) {
@@ -28,9 +30,14 @@ export default function MapTraversal() {
       // Play next song
       playSong(audioRef, result.songName, false);
     }
+
+    if (result.gameOver && result.newHighScore) {
+      setIsNewHighScore(true);
+    }
   };
 
   const handleRestart = () => {
+    setIsNewHighScore(false);
     const songName = resetGame();
     if (songName) {
       playSong(audioRef, songName, false);
@@ -98,6 +105,15 @@ export default function MapTraversal() {
                 <label className="osrs-frame guess-btn" style={{ color: '#ff4444' }}>
                   Game Over! Score: {gameState.score} tiles
                 </label>
+                {isNewHighScore ? (
+                  <label className="osrs-frame guess-btn" style={{ color: '#ffdd00', fontSize: '0.85rem' }}>
+                    New best!
+                  </label>
+                ) : highScore > 0 && (
+                  <label className="osrs-frame guess-btn" style={{ fontSize: '0.85rem' }}>
+                    Best: {highScore}
+                  </label>
+                )}
                 <label className="osrs-frame guess-btn" style={{ fontSize: '0.85rem' }}>
                   Last song: {gameState.currentSongName}
                 </label>
@@ -110,6 +126,15 @@ export default function MapTraversal() {
                 <label className="osrs-frame guess-btn" style={{ color: '#00ff00' }}>
                   You unlocked every tile! Score: {gameState.score}
                 </label>
+                {isNewHighScore ? (
+                  <label className="osrs-frame guess-btn" style={{ color: '#ffdd00', fontSize: '0.85rem' }}>
+                    New best!
+                  </label>
+                ) : highScore > 0 && (
+                  <label className="osrs-frame guess-btn" style={{ fontSize: '0.85rem' }}>
+                    Best: {highScore}
+                  </label>
+                )}
                 <label className="osrs-frame guess-btn" style={{ fontSize: '0.85rem' }}>
                   Last song: {gameState.lastSongName}
                 </label>
@@ -130,7 +155,9 @@ export default function MapTraversal() {
       <TraversalMapWrapper
         gameState={gameState}
         wrongGuessRegionIds={wrongGuessRegionIds}
+        eliminatedRegionIds={eliminatedRegionIds}
         onRegionClick={onRegionClick}
+        onRegionRightClick={toggleEliminatedRegion}
       />
 
     </>

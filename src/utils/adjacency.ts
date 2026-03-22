@@ -24,6 +24,43 @@ import { Position } from 'geojson';
 import geojsondata from '../data/GeoJSON';
 import { decodeHTML } from './string-utils';
 
+export interface PortLink {
+  regionA: number;
+  coordA: [number, number]; // [x, y] game coords — exact port location
+  regionB: number;
+  coordB: [number, number]; // [x, y] game coords — exact port location
+}
+
+export const PORT_LINKS: PortLink[] = [
+  { regionA: 163, coordA: [2138, 3900], regionB: 137, coordB: [2224, 3796] }, // Isle of Everywhere ↔ The Galleon
+  { regionA: 137, coordA: [2213, 3794], regionB: 252, coordB: [2621, 3696] }, // The Galleon ↔ Rellekka
+  { regionA: 252, coordA: [2630, 3690], regionB: 112, coordB: [2581, 3848] }, // Rellekka ↔ Etceteria
+  { regionA: 89, coordA: [2550, 3759], regionB: 252, coordB: [2619, 3685] }, // The Desolate Isle ↔ Rellekka
+  { regionA: 229, coordA: [2421, 3780], regionB: 252, coordB: [2640, 3710] }, // Norse Code ↔ Rellekka
+  { regionA: 322, coordA: [2312, 3780], regionB: 252, coordB: [2640, 3710] }, // Volcanic Vikings ↔ Rellekka
+  { regionA: 90, coordA: [2277, 4035], regionB: 252, coordB: [2640, 3698] }, // The Desolate Isle ↔ Rellekka
+  { regionA: 118, coordA: [2471, 3994], regionB: 252, coordB: [2619, 3685] }, // Exposed ↔ Rellekka
+  { regionA: 151, coordA: [2659, 3989], regionB: 64, coordB: [2708, 3736] }, // Have an Ice Day ↔ Borderland
+  { regionA: 191, coordA: [3362, 3448], regionB: 245, coordB: [3724, 3807] }, // Lullaby ↔ Preservation
+  { regionA: 235, coordA: [3704, 3488], regionB: 100, coordB: [3792, 3562] }, // The Other Side ↔ Dragontooth Island
+  { regionA: 235, coordA: [3710, 3497], regionB: 158, coordB: [3684, 2953] }, // The Other Side ↔ In the Brine
+  { regionA: 158, coordA: [3684, 2953], regionB: 348, coordB: [3786, 2829] }, // In the Brine ↔ Zombiism
+  { regionA: 269, coordA: [3038, 3193], regionB: 231, coordB: [2661, 2678] }, // Sea Shanty 2 ↔ Null and Void
+  { regionA: 204, coordA: [2892, 2727], regionB: 161, coordB: [2803, 2703] }, // Marooned ↔ Island Life
+  { regionA: 204, coordA: [2892, 2727], regionB: 141, coordB: [2466, 3495] }, // Marooned ↔ Gnome King
+  { regionA: 269, coordA: [3048, 3234], regionB: 53, coordB: [2834, 3335] }, // Sea Shanty 2 ↔ Background
+  { regionA: 99, coordA: [1824, 3691], regionB: 269, coordB: [3056, 3245] }, // Down by the Docks ↔ Sea Shanty 2
+  { regionA: 233, coordA: [2578, 2840], regionB: 353, coordB: [2910, 3227] }, // On the Shore ↔ Emperor
+  { regionA: 140, coordA: [1369, 3641], regionB: 131, coordB: [1406, 3612] }, // Gill Bill ↔ The Forests of Shayzien
+  { regionA: 23, coordA: [1494, 2985], regionB: 27, coordB: [1444, 2977] }, // Varlamore's Sunset ↔ Peace and Prosperity / Isle of Serenity
+];
+
+export function getPortLinksForRegion(regionId: number): PortLink[] {
+  return PORT_LINKS.filter(
+    (link) => link.regionA === regionId || link.regionB === regionId,
+  );
+}
+
 export interface TraversalRegion {
   id: number;
   songNames: string[];
@@ -89,6 +126,29 @@ function splitIntoClusters(polygons: Position[][]): Position[][][] {
 
   return Array.from(groups.values());
 }
+
+// Region IDs excluded from traversal because they are fully contained inside other
+// regions with no shared edges, making them unreachable.
+const EXCLUDED_REGION_IDS = new Set([
+  2,   // "Scorching Horizon / ..." — duplicate cluster inside region 1 (same songs)
+  14,  // "The City of Sun / ..." — duplicate cluster inside region 13 (same songs)
+  21,  // "Ready for the Hunt" — inset inside region 1 "Scorching Horizon / ..."
+  98,  // "Doorways" — duplicate cluster inside region 97 (same song)
+  256, // "Rose" — inset inside region 355 "Getting Down to Business"
+  281, // "The Waiting Game" — inset inside region 97 "Doorways"
+  324, // "The Waiting Game" — duplicate cluster inside region 97 "Doorways"
+  356, // "Getting Down to Business" — duplicate cluster inside region 355 (same song)
+]);
+
+// Manual adjacency overrides for inset regions that are playable but have no
+// shared edges with their containing region (edge detection can't find them).
+// Each pair [a, b] adds a bidirectional neighbor relationship.
+const ADJACENCY_OVERRIDES: [number, number][] = [
+  [12, 13],   // "Are You Not Entertained" inset inside "The City of Sun / Prospering Fortune"
+  [125, 355], // "A Farmer's Grind" inset inside "Getting Down to Business"
+  [148, 355], // "Grow Grow Grow" inset inside "Getting Down to Business"
+  [154, 355], // "Hoe Down" inset inside "Getting Down to Business"
+];
 
 function buildRegions(): TraversalRegion[] {
   const features = geojsondata.features;
@@ -169,6 +229,9 @@ function buildRegions(): TraversalRegion[] {
     }
   }
 
+  // Remove excluded regions (unreachable inset regions — see EXCLUDED_REGION_IDS)
+  const filteredRegions = regions.filter((r) => !EXCLUDED_REGION_IDS.has(r.id));
+
   // Build edge-point -> region ID lookup.
   // Sample integer points along each edge so that collinear overlapping edges
   // (e.g. Medieval [3268,3456]->[3328,3456] overlapping Doorways [3264,3456]->[3328,3456])
@@ -194,7 +257,7 @@ function buildRegions(): TraversalRegion[] {
     }
   }
 
-  for (const region of regions) {
+  for (const region of filteredRegions) {
     for (const polygon of region.polygons) {
       for (let i = 0; i < polygon.length; i++) {
         const curr = polygon[i];
@@ -205,7 +268,7 @@ function buildRegions(): TraversalRegion[] {
   }
 
   // Two regions are neighbors if they share at least one interior edge point
-  for (const region of regions) {
+  for (const region of filteredRegions) {
     const neighborSet = new Set<number>();
 
     for (const polygon of region.polygons) {
@@ -237,12 +300,37 @@ function buildRegions(): TraversalRegion[] {
     region.neighborIds = Array.from(neighborSet).sort((a, b) => a - b);
   }
 
+  // Apply manual adjacency overrides (bidirectional)
+  const regionLookup = new Map(filteredRegions.map((r) => [r.id, r]));
+  for (const [a, b] of ADJACENCY_OVERRIDES) {
+    const ra = regionLookup.get(a);
+    const rb = regionLookup.get(b);
+    if (ra && rb) {
+      if (!ra.neighborIds.includes(b)) ra.neighborIds.push(b);
+      if (!rb.neighborIds.includes(a)) rb.neighborIds.push(a);
+      ra.neighborIds.sort((x, y) => x - y);
+      rb.neighborIds.sort((x, y) => x - y);
+    }
+  }
+
+  // Apply port link adjacency (bidirectional, same as overrides)
+  for (const link of PORT_LINKS) {
+    const ra = regionLookup.get(link.regionA);
+    const rb = regionLookup.get(link.regionB);
+    if (ra && rb) {
+      if (!ra.neighborIds.includes(link.regionB)) ra.neighborIds.push(link.regionB);
+      if (!rb.neighborIds.includes(link.regionA)) rb.neighborIds.push(link.regionA);
+      ra.neighborIds.sort((x, y) => x - y);
+      rb.neighborIds.sort((x, y) => x - y);
+    }
+  }
+
   // === DEBUG LOGGING ===
   const DEBUG_SONGS = ["Varlamore's Sunset", "Scorching Horizon", "The Undying Light", "Creatures of Varlamore"];
-  for (const region of regions) {
+  for (const region of filteredRegions) {
     if (DEBUG_SONGS.some((s) => region.songNames.some((sn) => sn.includes(s)))) {
       const neighbors = region.neighborIds.map((nId) => {
-        const n = regions.find((r) => r.id === nId);
+        const n = filteredRegions.find((r) => r.id === nId);
         return `${nId}:${n?.songNames.join('/') ?? '?'}`;
       });
       console.log(`[ADJ DEBUG] Region ${region.id} "${region.songNames.join(', ')}"`);;
@@ -265,7 +353,7 @@ function buildRegions(): TraversalRegion[] {
   }
 
   // Log regions with 0 or 1 neighbors as potential issues
-  const lowNeighborRegions = regions.filter((r) => r.neighborIds.length <= 1);
+  const lowNeighborRegions = filteredRegions.filter((r) => r.neighborIds.length <= 1);
   if (lowNeighborRegions.length > 0) {
     console.log(`[ADJ DEBUG] Regions with 0-1 neighbors (${lowNeighborRegions.length}):`);
     for (const r of lowNeighborRegions) {
@@ -287,7 +375,7 @@ function buildRegions(): TraversalRegion[] {
   }
   // === END DEBUG LOGGING ===
 
-  return regions;
+  return filteredRegions;
 }
 
 function ensureBuilt() {

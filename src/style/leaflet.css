@@ -36,6 +36,20 @@
   }
 }
 
+.port-link-icon {
+  image-rendering: pixelated;
+}
+
+.port-link-line {
+  animation: marching-ants 1s linear infinite;
+}
+
+@keyframes marching-ants {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+
 @media (max-width: 720px) {
   .leaflet-control-zoom {
     visibility: hidden !important;

@@ -8,4 +8,5 @@ export const LOCAL_STORAGE = {
   maxStreak: 'maxStreak',
   correctGuessCount: 'correctGuessCount',
   incorrectGuessCount: 'incorrectGuessCount',
+  traversalHighScore: 'traversalHighScore',
 };

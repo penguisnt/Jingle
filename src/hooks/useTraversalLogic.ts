@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { LOCAL_STORAGE } from '../constants/localStorage';
 import { getNeighborIds, getRegionById, getSurfaceRegions } from '../utils/adjacency';
 
 export type TraversalStatus = 'waiting' | 'playing' | 'lost' | 'won';
@@ -41,6 +42,11 @@ function computeFrontier(unlockedIds: number[]): number[] {
   return Array.from(frontierSet);
 }
 
+function getStoredHighScore(): number {
+  const stored = localStorage.getItem(LOCAL_STORAGE.traversalHighScore);
+  return stored ? parseInt(stored, 10) || 0 : 0;
+}
+
 export default function useTraversalLogic() {
   const [gameState, setGameState] = useState<TraversalGameState>({
     status: 'waiting',
@@ -58,8 +64,36 @@ export default function useTraversalLogic() {
   // Track wrong guesses for this round — these regions show as disabled until next correct guess
   const [wrongGuessRegionIds, setWrongGuessRegionIds] = useState<Set<number>>(new Set());
 
+  // Track eliminated (flagged) regions — visual aid only
+  const [eliminatedRegionIds, setEliminatedRegionIds] = useState<Set<number>>(new Set());
+
+  // High score
+  const [highScore, setHighScore] = useState<number>(getStoredHighScore);
+
   // Ref to track if game has been initialized
   const initializedRef = useRef(false);
+
+  const updateHighScore = useCallback((score: number) => {
+    const current = getStoredHighScore();
+    if (score > current) {
+      localStorage.setItem(LOCAL_STORAGE.traversalHighScore, String(score));
+      setHighScore(score);
+      return true;
+    }
+    return false;
+  }, []);
+
+  const toggleEliminatedRegion = useCallback((regionId: number) => {
+    setEliminatedRegionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(regionId)) {
+        next.delete(regionId);
+      } else {
+        next.add(regionId);
+      }
+      return next;
+    });
+  }, []);
 
   const initGame = useCallback((startRegionId?: number) => {
     const regions = getSurfaceRegions();
@@ -87,6 +121,7 @@ export default function useTraversalLogic() {
         sharkRegionIds: [],
         correctStreak: 0,
       });
+      updateHighScore(1);
       return song;
     }
 
@@ -109,10 +144,10 @@ export default function useTraversalLogic() {
 
     initializedRef.current = true;
     return targetSong;
-  }, []);
+  }, [updateHighScore]);
 
   const handleRegionClick = useCallback(
-    (regionId: number): { correct: boolean; songName: string | null; gameOver: boolean; healed?: boolean } => {
+    (regionId: number): { correct: boolean; songName: string | null; gameOver: boolean; healed?: boolean; newHighScore?: boolean } => {
       const state = gameState;
 
       if (state.status !== 'playing' || state.targetRegionId === null) {
@@ -120,8 +155,9 @@ export default function useTraversalLogic() {
       }
 
       if (regionId === state.targetRegionId) {
-        // Correct guess — clear wrong guesses for the round
+        // Correct guess — clear wrong guesses and eliminations for the round
         setWrongGuessRegionIds(new Set());
+        setEliminatedRegionIds(new Set());
 
         // Check if shark was eaten (correct guess on a shark tile)
         const ateShark = state.sharkRegionIds.includes(regionId);
@@ -140,6 +176,8 @@ export default function useTraversalLogic() {
 
         if (newFrontier.length === 0) {
           // Won - no more frontier
+          const finalScore = newUnlocked.length;
+          const isNewHigh = updateHighScore(finalScore);
           setGameState({
             ...state,
             status: 'won',
@@ -148,11 +186,11 @@ export default function useTraversalLogic() {
             frontierRegionIds: [],
             targetRegionId: null,
             lastSongName: state.currentSongName,
-            score: newUnlocked.length,
+            score: finalScore,
             sharkRegionIds: [],
             correctStreak: newStreak,
           });
-          return { correct: true, songName: null, gameOver: true, healed: ateShark };
+          return { correct: true, songName: null, gameOver: true, healed: ateShark, newHighScore: isNewHigh };
         }
 
         const nextTargetId = pickRandom(newFrontier);
@@ -189,12 +227,14 @@ export default function useTraversalLogic() {
         const newLives = state.lives - 1;
 
         if (newLives <= 0) {
+          const finalScore = state.score;
+          const isNewHigh = updateHighScore(finalScore);
           setGameState({
             ...state,
             status: 'lost',
             lives: 0,
           });
-          return { correct: false, songName: null, gameOver: true };
+          return { correct: false, songName: null, gameOver: true, newHighScore: isNewHigh };
         }
 
         setGameState({
@@ -204,20 +244,24 @@ export default function useTraversalLogic() {
         return { correct: false, songName: null, gameOver: false };
       }
     },
-    [gameState],
+    [gameState, updateHighScore],
   );
 
   const resetGame = useCallback(() => {
     initializedRef.current = false;
     setWrongGuessRegionIds(new Set());
+    setEliminatedRegionIds(new Set());
     return initGame();
   }, [initGame]);
 
   return {
     gameState,
     wrongGuessRegionIds,
+    eliminatedRegionIds,
+    highScore,
     initGame,
     handleRegionClick,
+    toggleEliminatedRegion,
     resetGame,
   };
 }
